@@ -80,6 +80,12 @@ fi
 
 download() {
 #Download NCT6687d Drivers
+if [ -z "$LAT_PACKAGE" ]; then
+  echo
+  echo "-----------------------Can't find NCT6687d Drivers--------------------------"
+  rm -rf &plugin; &emhttp;
+  exit 1
+fi
 if wget -q -nc --show-progress --progress=bar:force:noscroll -O "&packages;/${KERNEL_V%%-*}/${LAT_PACKAGE}" "${DL_URL}/${LAT_PACKAGE}" ; then
   wget -q -nc --show-progress --progress=bar:force:noscroll -O "&packages;/${KERNEL_V%%-*}/${LAT_PACKAGE}.md5" "${DL_URL}/${LAT_PACKAGE}.md5"
   if [ "$(md5sum &packages;/${KERNEL_V%%-*}/${LAT_PACKAGE} | awk '{print $1}')" != "$(cat &packages;/${KERNEL_V%%-*}/${LAT_PACKAGE}.md5 | awk '{print $1}')" ]; then
@@ -98,12 +104,26 @@ else
 fi
 }
 
+resolve_latest_package() {
+LAT_PACKAGE="$(wget -qO- "https://api.github.com/repos/ich777/unraid-nct6687-driver/releases/tags/${KERNEL_V}" 2>/dev/null | grep -oE '"name": *"[^"]+"' | sed -E 's/.*"name": *"([^"]+)".*/\1/' | grep "${PACKAGE}" | grep -E -v '\.md5$' | sort -V | tail -1)"
+if [ -z "$LAT_PACKAGE" ]; then
+  LAT_PACKAGE="$(wget -qO- "https://github.com/ich777/unraid-nct6687-driver/releases/expanded_assets/${KERNEL_V}" 2>/dev/null | grep -oE "${PACKAGE}[^\"&lt;>]*${KERNEL_V}[^\"&lt;>]*\.txz" | grep -E -v '\.md5$' | sort -V | tail -1)"
+fi
+}
+
 check() {
 if ! ls -1 &packages;/${KERNEL_V%%-*}/ | grep -q "${PACKAGE}" ; then
-  LAT_PACKAGE="$(wget -qO- https://api.github.com/repos/ich777/unraid-nct6687-driver/releases/tags/${KERNEL_V} | jq -r '.assets[].name' | grep "${PACKAGE}" | grep -E -v '\.md5$' | sort -V | tail -1)"
+  resolve_latest_package
   echo
   echo "-----------------------Downloading NCT6687d Drivers!-------------------------"
   echo "---------This could take some time, please don't close this window!----------"
+  if [ -z "$LAT_PACKAGE" ]; then
+    echo
+    echo "-----------------------Can't find NCT6687d Drivers--------------------------"
+    echo "Please check: https://github.com/ich777/unraid-nct6687-driver/releases/tag/${KERNEL_V}"
+    rm -rf &plugin; &emhttp;
+    exit 1
+  fi
   download
 else
   echo
